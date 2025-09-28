@@ -14,6 +14,7 @@ from app.settings import settings
 from app.notion import notion_api
 from app.blocks_to_text import blocks_to_text, get_page_title
 from app.storage import upload_text_public_flexible
+from app.pdf_generator import generate_pdf_from_markdown
 
 
 def extract_task_properties(task_page: Dict[str, Any]) -> Dict[str, str]:
@@ -418,6 +419,12 @@ async def web_interface():
                 text-align: center;
                 display: none;
             }
+            .download-buttons {
+                display: flex;
+                gap: 15px;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
             .download-btn {
                 background: #28a745;
                 color: white;
@@ -425,10 +432,19 @@ async def web_interface():
                 text-decoration: none;
                 border-radius: 5px;
                 display: inline-block;
-                margin: 10px;
+                transition: all 0.3s ease;
+                font-weight: 500;
             }
             .download-btn:hover {
                 background: #218838;
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            }
+            .pdf-btn {
+                background: #dc3545;
+            }
+            .pdf-btn:hover {
+                background: #c82333;
             }
             .spinner {
                 border: 3px solid #f3f3f3;
@@ -470,7 +486,14 @@ async def web_interface():
             
             <div id="downloadSection" class="download-section">
                 <h3>Report Generated Successfully!</h3>
-                <a id="downloadBtn" class="download-btn" href="#" download>Download Report</a>
+                <div class="download-buttons">
+                    <a id="downloadBtn" class="download-btn" href="#" download>
+                        📄 Download Markdown
+                    </a>
+                    <a id="downloadPdfBtn" class="download-btn pdf-btn" href="#" download>
+                        📋 Download PDF
+                    </a>
+                </div>
             </div>
         </div>
 
@@ -583,8 +606,82 @@ async def web_interface():
             function showDownload(url) {
                 const downloadSection = document.getElementById('downloadSection');
                 const downloadBtn = document.getElementById('downloadBtn');
+                const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+                
                 downloadBtn.href = url;
                 downloadSection.style.display = 'block';
+                
+                // Store the page ID for PDF generation
+                downloadPdfBtn.onclick = function(e) {
+                    e.preventDefault();
+                    generatePdf();
+                };
+            }
+            
+            // Generate PDF
+            async function generatePdf() {
+                const generateBtn = document.getElementById('generateBtn');
+                const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+                
+                // Get the current page ID from the form
+                const projectSelect = document.getElementById('projectSelect');
+                const customInput = document.getElementById('customInput');
+                
+                let pageId = projectSelect.value;
+                if (customInput.value.trim()) {
+                    pageId = customInput.value.trim();
+                }
+                
+                if (!pageId) {
+                    showStatus('Please select a project or enter a URL/Page ID', 'error');
+                    return;
+                }
+                
+                // Show loading state
+                downloadPdfBtn.innerHTML = '<span class="spinner"></span>Generating PDF...';
+                downloadPdfBtn.style.pointerEvents = 'none';
+                
+                try {
+                    const response = await fetch('/api/generate-pdf', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ page_id: pageId })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Convert file URL to download URL
+                        let downloadUrl = result.file_url;
+                        if (downloadUrl.startsWith('file://')) {
+                            let filePath = downloadUrl.replace('file://', '');
+                            if (filePath.startsWith('/app/local_reports/')) {
+                                filePath = filePath.replace('/app/local_reports/', 'local_reports/');
+                            }
+                            downloadUrl = '/download' + filePath;
+                        }
+                        
+                        // Update PDF button with download link
+                        downloadPdfBtn.href = downloadUrl;
+                        downloadPdfBtn.innerHTML = '📋 Download PDF';
+                        downloadPdfBtn.style.pointerEvents = 'auto';
+                        
+                        // Trigger download
+                        downloadPdfBtn.click();
+                        
+                        showStatus('PDF generated successfully!', 'success');
+                    } else {
+                        showStatus(`Error: ${result.detail || 'Failed to generate PDF'}`, 'error');
+                        downloadPdfBtn.innerHTML = '📋 Download PDF';
+                        downloadPdfBtn.style.pointerEvents = 'auto';
+                    }
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, 'error');
+                    downloadPdfBtn.innerHTML = '📋 Download PDF';
+                    downloadPdfBtn.style.pointerEvents = 'auto';
+                }
             }
             
             // Hide download section
@@ -740,6 +837,158 @@ async def download_file(file_path: str):
         media_type='application/octet-stream',
         filename=os.path.basename(file_path)
     )
+
+
+@app.post("/api/generate-pdf")
+async def generate_pdf_api(request: GenerateRequest):
+    """Generate PDF report via API with URL parsing."""
+    try:
+        page_id = parse_notion_url(request.page_id)
+        
+        # Generate the markdown report first
+        report_data = await generate_report(page_id)
+        
+        # The generate_report function doesn't return content directly, we need to generate it
+        # Let's call the internal report generation logic
+        project_page = await notion_api.get_page(page_id)
+        project_title = get_page_title(project_page)
+        
+        # Extract relation IDs
+        notes_ids = notion_api.extract_relation_ids(
+            project_page, 
+            settings.notion_rel_project_to_notes
+        )
+        tasks_ids = notion_api.extract_relation_ids(
+            project_page, 
+            settings.notion_rel_project_to_tasks
+        )
+        
+        # Fetch all pages and their blocks
+        project_blocks = await notion_api.get_block_children(page_id)
+        project_content = blocks_to_text(project_blocks)
+        
+        # Fetch notes
+        notes_content = []
+        for note_id in notes_ids:
+            try:
+                note_page = await notion_api.get_page(note_id)
+                note_title = get_page_title(note_page)
+                note_blocks = await notion_api.get_block_children(note_id)
+                note_content = blocks_to_text(note_blocks, flatten_headings=True)
+                notes_content.append(f"### {note_title}\n\n{note_content}\n")
+            except Exception as e:
+                notes_content.append(f"### [Error loading note: {str(e)}]\n\n")
+        
+        # Fetch tasks
+        tasks_content = []
+        for task_id in tasks_ids:
+            try:
+                task_page = await notion_api.get_page(task_id)
+                task_title = get_page_title(task_page)
+                
+                # Extract task properties
+                task_props = extract_task_properties(task_page)
+                
+                # Build property string with status first and highlighted
+                prop_parts = []
+                if task_props.get("status"):
+                    prop_parts.append(f"**Status: {task_props['status']}**")
+                if task_props.get("priority"):
+                    prop_parts.append(f"Priority: {task_props['priority']}")
+                if task_props.get("due_date"):
+                    prop_parts.append(f"Due: {task_props['due_date']}")
+                if task_props.get("date_done"):
+                    prop_parts.append(f"Done: {task_props['date_done']}")
+                if task_props.get("assignee"):
+                    prop_parts.append(f"Assignee: {task_props['assignee']}")
+                if task_props.get("tags"):
+                    prop_parts.append(f"Tags: {task_props['tags']}")
+                if task_props.get("info"):
+                    prop_parts.append(f"Info: {task_props['info']}")
+                
+                properties_str = f" - {', '.join(prop_parts)}" if prop_parts else ""
+                
+                # Get task content with flattened headings
+                task_blocks = await notion_api.get_block_children(task_id)
+                task_content = blocks_to_text(task_blocks, flatten_headings=True)
+                
+                tasks_content.append(f"### {task_title}{properties_str}\n\n{task_content}\n")
+            except Exception as e:
+                tasks_content.append(f"### [Error loading task: {str(e)}]\n\n")
+        
+        # Build the main content
+        main_content = f"""# {project_title}
+
+**Generated:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+---
+
+## Project Overview
+
+{project_content}
+
+---
+
+## Notes
+
+{chr(10).join(notes_content) if notes_content else "*No notes found.*"}
+
+---
+
+## Tasks
+
+{chr(10).join(tasks_content) if tasks_content else "*No tasks found.*"}
+
+---
+
+*Report generated by Notion Report Generator*
+"""
+        
+        # Generate table of contents and insert it after the title
+        toc = generate_table_of_contents(main_content)
+        
+        # Insert TOC after the title and generation info
+        title_section = f"# {project_title}\n\n**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        rest_of_content = main_content[len(title_section):]
+        
+        md_content = title_section + toc + rest_of_content
+        title = project_title
+        
+        if not md_content:
+            raise HTTPException(status_code=400, detail="No content to convert to PDF")
+        
+        # Generate PDF filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        safe_title = slugify(title)
+        pdf_filename = f"project-{safe_title}-{timestamp}.pdf"
+        
+        # Create PDF path
+        project_id = page_id.replace('-', '')[:4]
+        pdf_dir = os.path.join(settings.local_storage_path, "reports", project_id)
+        pdf_path = os.path.join(pdf_dir, pdf_filename)
+        
+        # Generate PDF
+        try:
+            generated_pdf_path = generate_pdf_from_markdown(md_content, pdf_path, title)
+            
+            # Return file URL for download
+            file_url = f"file://{generated_pdf_path}"
+            
+            return {
+                "success": True,
+                "title": title,
+                "file_url": file_url,
+                "filename": pdf_filename,
+                "message": f"PDF report generated successfully: {pdf_filename}"
+            }
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
+            
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate PDF report: {str(e)}")
 
 
 if __name__ == "__main__":
