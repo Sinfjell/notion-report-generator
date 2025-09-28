@@ -34,4 +34,6 @@ docker run --name notion-report-generator -p 8080:8080 \
     -e USE_LOCAL_STORAGE=true \
     -e LOCAL_STORAGE_PATH=/app/local_reports \
     -v "$(pwd)/local_reports:/app/local_reports" \
+    --memory=1g \
+    --memory-swap=2g \
     notion-report-generator
