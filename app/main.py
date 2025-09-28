@@ -150,6 +150,7 @@ class ProjectOption(BaseModel):
     id: str
     title: str
     url: str
+    status: str
 
 
 @app.get("/healthz")
@@ -358,6 +359,21 @@ async def web_interface():
                 outline: none;
                 border-color: #007bff;
             }
+            select:disabled {
+                background-color: #f8f9fa;
+                color: #6c757d;
+            }
+            select.loaded {
+                border-color: #28a745;
+            }
+            optgroup {
+                font-weight: bold;
+                color: #495057;
+                background-color: #f8f9fa;
+            }
+            option {
+                padding: 8px 12px;
+            }
             button {
                 background: #007bff;
                 color: white;
@@ -463,23 +479,91 @@ async def web_interface():
             
             // Load projects on page load
             async function loadProjects() {
+                const select = document.getElementById('projectSelect');
+                select.innerHTML = '<option value="">🔄 Loading projects...</option>';
+                select.disabled = true;
+                
                 try {
                     const response = await fetch('/api/projects');
                     projects = await response.json();
                     
-                    const select = document.getElementById('projectSelect');
                     select.innerHTML = '<option value="">Select a project...</option>';
                     
-                    projects.forEach(project => {
-                        const option = document.createElement('option');
-                        option.value = project.id;
-                        option.textContent = project.title;
-                        select.appendChild(option);
+                    // Group projects by status
+                    const groupedProjects = groupProjectsByStatus(projects);
+                    
+                    // Add grouped options
+                    Object.keys(groupedProjects).forEach(status => {
+                        const group = groupedProjects[status];
+                        if (group.length > 0) {
+                            const optgroup = document.createElement('optgroup');
+                            optgroup.label = `${getStatusIcon(status)} ${status} (${group.length})`;
+                            select.appendChild(optgroup);
+                            
+                            group.forEach(project => {
+                                const option = document.createElement('option');
+                                option.value = project.id;
+                                option.textContent = project.title;
+                                optgroup.appendChild(option);
+                            });
+                        }
                     });
+                    
+                    // Auto-select first project
+                    if (projects.length > 0) {
+                        select.value = projects[0].id;
+                        select.classList.add('loaded');
+                    }
+                    
+                    select.disabled = false;
                 } catch (error) {
                     console.error('Error loading projects:', error);
-                    document.getElementById('projectSelect').innerHTML = '<option value="">Error loading projects</option>';
+                    select.innerHTML = '<option value="">❌ Error loading projects</option>';
+                    select.disabled = false;
                 }
+            }
+            
+            // Group projects by status
+            function groupProjectsByStatus(projects) {
+                const grouped = {};
+                projects.forEach(project => {
+                    const status = project.status || 'No Status';
+                    if (!grouped[status]) {
+                        grouped[status] = [];
+                    }
+                    grouped[status].push(project);
+                });
+                
+                // Sort statuses: Active first, then alphabetically
+                const statusOrder = ['Active', 'In Progress', 'Planning', 'On Hold', 'Completed', 'No Status'];
+                const sortedGrouped = {};
+                statusOrder.forEach(status => {
+                    if (grouped[status]) {
+                        sortedGrouped[status] = grouped[status];
+                    }
+                });
+                
+                // Add any remaining statuses
+                Object.keys(grouped).forEach(status => {
+                    if (!statusOrder.includes(status)) {
+                        sortedGrouped[status] = grouped[status];
+                    }
+                });
+                
+                return sortedGrouped;
+            }
+            
+            // Get status icon
+            function getStatusIcon(status) {
+                const icons = {
+                    'Active': '🟢',
+                    'In Progress': '🟡',
+                    'Planning': '🔵',
+                    'On Hold': '🟠',
+                    'Completed': '✅',
+                    'No Status': '⚪'
+                };
+                return icons[status] || '⚪';
             }
             
             // Show status message
@@ -526,6 +610,9 @@ async def web_interface():
                 // Clear dropdown validation if custom input is used
                 if (customInput.value.trim()) {
                     projectSelect.setCustomValidity('');
+                    projectSelect.required = false;
+                } else {
+                    projectSelect.required = true;
                 }
                 
                 // Disable button and show loading
@@ -595,10 +682,30 @@ async def get_projects():
         for page in pages:
             title = get_page_title(page)
             page_id = page.get("id", "")
+            
+            # Extract status from page properties
+            status = "No Status"
+            properties = page.get("properties", {})
+            
+            # Check for status in various property names
+            for status_prop_name in ["Status", "Kanban", "State", "Phase"]:
+                status_prop = properties.get(status_prop_name, {})
+                if status_prop.get("type") == "status":
+                    status_value = status_prop.get("status", {})
+                    if status_value and status_value.get("name"):
+                        status = status_value.get("name")
+                        break
+                elif status_prop.get("type") == "select":
+                    select_value = status_prop.get("select", {})
+                    if select_value and select_value.get("name"):
+                        status = select_value.get("name")
+                        break
+            
             projects.append(ProjectOption(
                 id=page_id,
                 title=title,
-                url=f"https://notion.so/{page_id.replace('-', '')}"
+                url=f"https://notion.so/{page_id.replace('-', '')}",
+                status=status
             ))
         
         return projects
