@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-09-28
+
+### Added
+- 📄 **PDF Export**: Complete PDF generation with professional styling and table of contents
+- 🎨 **PDF Styling**: Custom CSS with page breaks, headers, footers, and responsive design
+- 📊 **Enhanced Content**: Comprehensive Notion block processing including toggles and nested content
+- 🔄 **Fallback System**: Robust PDF generation with simplified HTML fallback for complex content
+- 📱 **UI Integration**: PDF download button with loading states and progress indicators
+- ⚡ **Performance**: Memory-optimized Docker container with proper resource limits
+
+### Changed
+- 🧹 **Production Ready**: Removed all debug code and console logging for clean production deployment
+- 📝 **Content Processing**: Enhanced block-to-text conversion with recursive child block fetching
+- 🎯 **Error Handling**: Improved error handling with proper timeout mechanisms and user feedback
+- 🔧 **Code Quality**: Clean, maintainable codebase with comprehensive error logging for production debugging
+
+### Fixed
+- 🐛 **PDF Download**: Fixed PDF download button getting stuck in loading state
+- 📄 **Content Capture**: Resolved missing content from Notion toggles and nested blocks
+- 🔄 **UI Reliability**: Enhanced frontend error handling and timeout protection
+- 📊 **Report Completeness**: Ensured all Notion content is properly captured in both MD and PDF formats
+
+### Technical Details
+- Added WeasyPrint integration for high-quality PDF generation
+- Implemented recursive block processing for complete content capture
+- Enhanced JavaScript with proper error handling and timeout management
+- Added HEAD method support for file existence checking
+- Improved Docker memory limits for PDF generation stability
+- Comprehensive debug code cleanup while preserving essential error logging
+
 ## [1.2.0] - 2025-09-28
 
 ### Added
