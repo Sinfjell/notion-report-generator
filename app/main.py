@@ -12,7 +12,7 @@ import urllib.parse
 
 from app.settings import settings
 from app.notion import notion_api
-from app.blocks_to_text import blocks_to_text, get_page_title
+from app.blocks_to_text import blocks_to_text, blocks_to_text_with_children, get_page_title
 from app.storage import upload_text_public_flexible
 from app.pdf_generator import generate_pdf_from_markdown
 
@@ -179,7 +179,7 @@ async def generate_report(page_id: str) -> dict:
         
         # 3. Fetch all pages and their blocks
         project_blocks = await notion_api.get_block_children(page_id)
-        project_content = blocks_to_text(project_blocks)
+        project_content = await blocks_to_text_with_children(project_blocks, notion_api)
         
         # Fetch notes
         notes_content = []
@@ -188,7 +188,7 @@ async def generate_report(page_id: str) -> dict:
                 note_page = await notion_api.get_page(note_id)
                 note_title = get_page_title(note_page)
                 note_blocks = await notion_api.get_block_children(note_id)
-                note_content = blocks_to_text(note_blocks, flatten_headings=True)
+                note_content = await blocks_to_text_with_children(note_blocks, notion_api, flatten_headings=True)
                 notes_content.append(f"### {note_title}\n\n{note_content}\n")
             except Exception as e:
                 notes_content.append(f"### [Error loading note: {str(e)}]\n\n")
@@ -224,7 +224,7 @@ async def generate_report(page_id: str) -> dict:
                 
                 # Get task content with flattened headings
                 task_blocks = await notion_api.get_block_children(task_id)
-                task_content = blocks_to_text(task_blocks, flatten_headings=True)
+                task_content = await blocks_to_text_with_children(task_blocks, notion_api, flatten_headings=True)
                 
                 tasks_content.append(f"### {task_title}{properties_str}\n\n{task_content}\n")
             except Exception as e:
@@ -865,7 +865,7 @@ async def generate_pdf_api(request: GenerateRequest):
         
         # Fetch all pages and their blocks
         project_blocks = await notion_api.get_block_children(page_id)
-        project_content = blocks_to_text(project_blocks)
+        project_content = await blocks_to_text_with_children(project_blocks, notion_api)
         
         # Fetch notes
         notes_content = []
@@ -874,7 +874,7 @@ async def generate_pdf_api(request: GenerateRequest):
                 note_page = await notion_api.get_page(note_id)
                 note_title = get_page_title(note_page)
                 note_blocks = await notion_api.get_block_children(note_id)
-                note_content = blocks_to_text(note_blocks, flatten_headings=True)
+                note_content = await blocks_to_text_with_children(note_blocks, notion_api, flatten_headings=True)
                 notes_content.append(f"### {note_title}\n\n{note_content}\n")
             except Exception as e:
                 notes_content.append(f"### [Error loading note: {str(e)}]\n\n")
@@ -910,7 +910,7 @@ async def generate_pdf_api(request: GenerateRequest):
                 
                 # Get task content with flattened headings
                 task_blocks = await notion_api.get_block_children(task_id)
-                task_content = blocks_to_text(task_blocks, flatten_headings=True)
+                task_content = await blocks_to_text_with_children(task_blocks, notion_api, flatten_headings=True)
                 
                 tasks_content.append(f"### {task_title}{properties_str}\n\n{task_content}\n")
             except Exception as e:
