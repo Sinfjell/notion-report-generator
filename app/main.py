@@ -855,17 +855,18 @@ async def download_file(file_path: str):
 async def generate_pdf_api(request: GenerateRequest):
     """Generate PDF report via API with URL parsing."""
     try:
+        print(f"DEBUG: PDF API - Parsing page ID: {request.page_id}")
         page_id = parse_notion_url(request.page_id)
+        print(f"DEBUG: PDF API - Parsed page ID: {page_id}")
         
-        # Generate the markdown report first
-        report_data = await generate_report(page_id)
-        
-        # The generate_report function doesn't return content directly, we need to generate it
-        # Let's call the internal report generation logic
+        # Get project details directly
+        print(f"DEBUG: PDF API - Fetching project page...")
         project_page = await notion_api.get_page(page_id)
         project_title = get_page_title(project_page)
+        print(f"DEBUG: PDF API - Project title: {project_title}")
         
         # Extract relation IDs
+        print(f"DEBUG: PDF API - Extracting relation IDs...")
         notes_ids = notion_api.extract_relation_ids(
             project_page, 
             settings.notion_rel_project_to_notes
@@ -874,27 +875,37 @@ async def generate_pdf_api(request: GenerateRequest):
             project_page, 
             settings.notion_rel_project_to_tasks
         )
+        print(f"DEBUG: PDF API - Found {len(notes_ids)} notes, {len(tasks_ids)} tasks")
         
         # Fetch all pages and their blocks
+        print(f"DEBUG: PDF API - Fetching project blocks...")
         project_blocks = await notion_api.get_block_children(page_id)
         project_content = await blocks_to_text_with_children(project_blocks, notion_api)
+        print(f"DEBUG: PDF API - Project content length: {len(project_content)}")
         
         # Fetch notes
+        print(f"DEBUG: PDF API - Processing {len(notes_ids)} notes...")
         notes_content = []
-        for note_id in notes_ids:
+        for i, note_id in enumerate(notes_ids):
             try:
+                print(f"DEBUG: PDF API - Processing note {i+1}/{len(notes_ids)}: {note_id}")
                 note_page = await notion_api.get_page(note_id)
                 note_title = get_page_title(note_page)
                 note_blocks = await notion_api.get_block_children(note_id)
                 note_content = await blocks_to_text_with_children(note_blocks, notion_api, flatten_headings=True)
                 notes_content.append(f"### {note_title}\n\n{note_content}\n")
+                print(f"DEBUG: PDF API - Note {i+1} processed successfully")
             except Exception as e:
+                print(f"Warning: Could not process note {note_id}: {e}")
                 notes_content.append(f"### [Error loading note: {str(e)}]\n\n")
+        print(f"DEBUG: PDF API - Processed {len(notes_content)} notes successfully")
         
         # Fetch tasks
+        print(f"DEBUG: PDF API - Processing {len(tasks_ids)} tasks...")
         tasks_content = []
-        for task_id in tasks_ids:
+        for i, task_id in enumerate(tasks_ids):
             try:
+                print(f"DEBUG: PDF API - Processing task {i+1}/{len(tasks_ids)}: {task_id}")
                 task_page = await notion_api.get_page(task_id)
                 task_title = get_page_title(task_page)
                 
@@ -925,8 +936,11 @@ async def generate_pdf_api(request: GenerateRequest):
                 task_content = await blocks_to_text_with_children(task_blocks, notion_api, flatten_headings=True)
                 
                 tasks_content.append(f"### {task_title}{properties_str}\n\n{task_content}\n")
+                print(f"DEBUG: PDF API - Task {i+1} processed successfully")
             except Exception as e:
+                print(f"Warning: Could not process task {task_id}: {e}")
                 tasks_content.append(f"### [Error loading task: {str(e)}]\n\n")
+        print(f"DEBUG: PDF API - Processed {len(tasks_content)} tasks successfully")
         
         # Build the main content
         main_content = f"""# {project_title}
