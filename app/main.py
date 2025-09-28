@@ -957,8 +957,8 @@ async def generate_pdf_api(request: GenerateRequest):
         if not md_content:
             raise HTTPException(status_code=400, detail="No content to convert to PDF")
         
-        # Generate PDF filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        # Generate PDF filename with microsecond precision to avoid conflicts
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_title = slugify(title)
         pdf_filename = f"project-{safe_title}-{timestamp}.pdf"
         
@@ -969,7 +969,29 @@ async def generate_pdf_api(request: GenerateRequest):
         
         # Generate PDF
         try:
+            print(f"DEBUG: Starting PDF generation for {title}")
+            print(f"DEBUG: Content length: {len(md_content)} characters")
+            print(f"DEBUG: PDF path: {pdf_path}")
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+            
+            # Check if content is valid
+            if not md_content or len(md_content.strip()) == 0:
+                raise ValueError("Empty content cannot be converted to PDF")
+            
             generated_pdf_path = generate_pdf_from_markdown(md_content, pdf_path, title)
+            
+            # Verify PDF was created
+            if not os.path.exists(generated_pdf_path):
+                raise FileNotFoundError(f"PDF file was not created at {generated_pdf_path}")
+            
+            # Check file size
+            file_size = os.path.getsize(generated_pdf_path)
+            if file_size == 0:
+                raise ValueError("Generated PDF file is empty")
+            
+            print(f"DEBUG: PDF generated successfully at: {generated_pdf_path} (size: {file_size} bytes)")
             
             # Return file URL for download
             file_url = f"file://{generated_pdf_path}"
@@ -983,6 +1005,10 @@ async def generate_pdf_api(request: GenerateRequest):
             }
             
         except Exception as e:
+            print(f"ERROR: PDF generation failed: {str(e)}")
+            print(f"ERROR: Exception type: {type(e).__name__}")
+            import traceback
+            print(f"ERROR: Traceback: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
             
     except ValueError as e:
