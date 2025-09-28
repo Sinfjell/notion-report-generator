@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2025-09-28
+
+### Fixed
+- 🐛 **Notes Fetching**: Fixed critical bug where notes were not being fetched from Notion
+- 🔐 **Database Access**: Resolved issue where Notion integration lacked access to notes database
+- 📊 **Report Completeness**: Reports now properly include all related notes and tasks
+- 📈 **Content Volume**: Reports now contain significantly more content (2x+ increase in size)
+
+### Technical Details
+- Root cause was missing database permissions for notes database
+- Integration now has proper access to both tasks and notes databases
+- All 4 notes are now properly fetched and included in generated reports
+- Enhanced debugging revealed the access permission issue
+
 ## [1.3.0] - 2025-09-28
 
 ### Added
