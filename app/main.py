@@ -992,7 +992,14 @@ async def generate_pdf_api(request: GenerateRequest):
             if not md_content or len(md_content.strip()) == 0:
                 raise ValueError("Empty content cannot be converted to PDF")
             
-            generated_pdf_path = generate_pdf_from_markdown(md_content, pdf_path, title)
+            try:
+                generated_pdf_path = generate_pdf_from_markdown(md_content, pdf_path, title)
+            except Exception as pdf_gen_error:
+                print(f"ERROR: PDF generation failed in generate_pdf_from_markdown: {pdf_gen_error}")
+                print(f"ERROR: PDF generation error type: {type(pdf_gen_error).__name__}")
+                import traceback
+                print(f"ERROR: PDF generation traceback: {traceback.format_exc()}")
+                raise pdf_gen_error
             
             # Verify PDF was created
             if not os.path.exists(generated_pdf_path):
@@ -1024,7 +1031,26 @@ async def generate_pdf_api(request: GenerateRequest):
             # Log additional context
             print(f"ERROR: Content length: {len(md_content) if 'md_content' in locals() else 'N/A'}")
             print(f"ERROR: PDF path: {pdf_path if 'pdf_path' in locals() else 'N/A'}")
-            raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
+            
+            # Try fallback with simplified content
+            try:
+                print("DEBUG: Attempting fallback PDF generation with simplified content...")
+                simplified_content = f"# {title}\n\n*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n{md_content[:5000]}..." if len(md_content) > 5000 else f"# {title}\n\n*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n{md_content}"
+                fallback_pdf_path = os.path.join(pdf_dir, f"project-{title.lower().replace(' ', '-')}-{datetime.now().strftime('%Y%m%d_%H%M%S')}-fallback.pdf")
+                fallback_pdf_path = generate_pdf_from_markdown(simplified_content, fallback_pdf_path, f"{title} (Simplified)")
+                file_url = f"file://{fallback_pdf_path}"
+                pdf_filename = os.path.basename(fallback_pdf_path)
+                print(f"DEBUG: Fallback PDF generated successfully at: {fallback_pdf_path}")
+                return {
+                    "success": True,
+                    "title": f"{title} (Simplified)",
+                    "file_url": file_url,
+                    "filename": pdf_filename,
+                    "message": f"PDF report generated successfully (simplified version): {pdf_filename}"
+                }
+            except Exception as fallback_error:
+                print(f"ERROR: Fallback PDF generation also failed: {fallback_error}")
+                raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
             
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

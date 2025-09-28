@@ -56,6 +56,8 @@ async def block_to_text_with_children(block: Dict[str, Any], notion_api, flatten
                 children_content = await blocks_to_text_with_children(children_blocks, notion_api, flatten_headings)
         except Exception as e:
             print(f"Warning: Could not fetch children for block {block_id}: {e}")
+            # Continue without children content rather than failing
+            children_content = ""
     
     if block_type == "heading_1":
         if flatten_headings:
