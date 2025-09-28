@@ -659,6 +659,16 @@ async def web_interface():
                 // Show loading state
                 downloadPdfBtn.innerHTML = '<span class="spinner"></span>Generating PDF...';
                 downloadPdfBtn.style.pointerEvents = 'none';
+                downloadPdfBtn.classList.add('loading');
+                
+                // Set a timeout to reset button if request takes too long
+                const timeoutId = setTimeout(() => {
+                    console.warn('PDF generation timeout - resetting button');
+                    downloadPdfBtn.innerHTML = '📋 Download PDF';
+                    downloadPdfBtn.style.pointerEvents = 'auto';
+                    downloadPdfBtn.classList.remove('loading');
+                    showStatus('PDF generation timed out. Please try again.', 'error');
+                }, 60000); // 60 second timeout
                 
                 try {
                     const response = await fetch('/api/generate-pdf', {
@@ -673,11 +683,16 @@ async def web_interface():
                     console.log('PDF Response ok:', response.ok);
                     
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        const errorText = await response.text();
+                        console.error('PDF Error response:', errorText);
+                        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                     }
                     
                     const result = await response.json();
                     console.log('PDF Response data:', result);
+                    
+                    // Clear timeout since we got a response
+                    clearTimeout(timeoutId);
                     
                     if (result.success) {
                         // Convert file URL to download URL
@@ -694,27 +709,42 @@ async def web_interface():
                             downloadUrl = `/download/${filePath}`;
                         }
                         
+                        console.log('Final download URL:', downloadUrl);
+                        
                         // Update PDF button with download link
                         downloadPdfBtn.href = downloadUrl;
                         downloadPdfBtn.innerHTML = '📋 Download PDF';
                         downloadPdfBtn.style.pointerEvents = 'auto';
+                        downloadPdfBtn.classList.remove('loading');
                         
                         // Show success message
                         showStatus('PDF generated successfully!', 'success');
                         
-                        // Auto-trigger download after a brief delay
+                        // Create a temporary link for download
+                        const tempLink = document.createElement('a');
+                        tempLink.href = downloadUrl;
+                        tempLink.download = result.filename || 'report.pdf';
+                        tempLink.style.display = 'none';
+                        document.body.appendChild(tempLink);
+                        
+                        // Trigger download
                         setTimeout(() => {
-                            downloadPdfBtn.click();
+                            tempLink.click();
+                            document.body.removeChild(tempLink);
                         }, 500);
                     } else {
                         showStatus(`Error: ${result.detail || 'Failed to generate PDF'}`, 'error');
                         downloadPdfBtn.innerHTML = '📋 Download PDF';
                         downloadPdfBtn.style.pointerEvents = 'auto';
+                        downloadPdfBtn.classList.remove('loading');
                     }
                 } catch (error) {
+                    clearTimeout(timeoutId);
+                    console.error('PDF Generation Error:', error);
                     showStatus(`Error: ${error.message}`, 'error');
                     downloadPdfBtn.innerHTML = '📋 Download PDF';
                     downloadPdfBtn.style.pointerEvents = 'auto';
+                    downloadPdfBtn.classList.remove('loading');
                 }
             }
             
