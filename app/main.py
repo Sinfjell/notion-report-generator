@@ -669,17 +669,29 @@ async def web_interface():
                         body: JSON.stringify({ page_id: pageId })
                     });
                     
+                    console.log('PDF Response status:', response.status);
+                    console.log('PDF Response ok:', response.ok);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
                     const result = await response.json();
+                    console.log('PDF Response data:', result);
                     
                     if (result.success) {
                         // Convert file URL to download URL
                         let downloadUrl = result.file_url;
                         if (downloadUrl.startsWith('file://')) {
                             let filePath = downloadUrl.replace('file://', '');
+                            // Handle both Docker (/app/local_reports/) and local (local_reports/) paths
                             if (filePath.startsWith('/app/local_reports/')) {
                                 filePath = filePath.replace('/app/local_reports/', 'local_reports/');
+                            } else if (filePath.startsWith('local_reports/')) {
+                                // Keep as is
                             }
-                            downloadUrl = '/download' + filePath;
+                            // Ensure proper download URL format
+                            downloadUrl = `/download/${filePath}`;
                         }
                         
                         // Update PDF button with download link
@@ -687,10 +699,13 @@ async def web_interface():
                         downloadPdfBtn.innerHTML = '📋 Download PDF';
                         downloadPdfBtn.style.pointerEvents = 'auto';
                         
-                        // Trigger download
-                        downloadPdfBtn.click();
-                        
+                        // Show success message
                         showStatus('PDF generated successfully!', 'success');
+                        
+                        // Auto-trigger download after a brief delay
+                        setTimeout(() => {
+                            downloadPdfBtn.click();
+                        }, 500);
                     } else {
                         showStatus(`Error: ${result.detail || 'Failed to generate PDF'}`, 'error');
                         downloadPdfBtn.innerHTML = '📋 Download PDF';
@@ -864,6 +879,7 @@ async def generate_report_api(request: GenerateRequest):
 
 
 @app.get("/download/{file_path:path}")
+@app.head("/download/{file_path:path}")
 async def download_file(file_path: str):
     """Download generated report file."""
     # Convert file:// URL to actual file path
