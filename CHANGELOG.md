@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-09-28
+
+### Added
+- 🔄 **Auto-Selection**: Projects dropdown now auto-selects first project when loaded
+- 📊 **Status Grouping**: Projects grouped by status with visual icons in dropdown
+- 🎨 **Enhanced UI**: Loading indicators and improved user feedback
+- 🔧 **Flexible Input**: URL input works without requiring dropdown selection
+- 📈 **Status Extraction**: Automatic status property extraction from Notion projects
+
+### Changed
+- 🎯 **Form Validation**: Dynamic validation based on input method (dropdown vs URL)
+- 🎨 **Dropdown Styling**: Enhanced with optgroups, status icons, and loading states
+- 📱 **User Experience**: Better visual feedback during project loading and selection
+
+### Fixed
+- 🐛 **Form Validation**: Fixed "Please select a project" warning when using URL input
+- 🔄 **Loading States**: Added proper loading indicators and disabled states
+- 📊 **Status Display**: Projects now show status information with appropriate icons
+
+### Technical Details
+- Added status property extraction from multiple Notion property types
+- Implemented project grouping by status with smart ordering
+- Enhanced JavaScript for better form handling and user feedback
+- Added CSS styling for loading states and status indicators
+
 ## [1.1.0] - 2025-09-28
 
 ### Added

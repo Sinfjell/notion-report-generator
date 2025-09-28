@@ -139,7 +139,7 @@ def parse_notion_url(url_or_id: str) -> str:
     raise ValueError("Invalid URL or page ID format")
 
 
-app = FastAPI(title="Notion Report Generator", version="1.1.0")
+app = FastAPI(title="Notion Report Generator", version="1.2.0")
 
 
 class GenerateRequest(BaseModel):

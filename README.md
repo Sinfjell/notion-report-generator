@@ -2,7 +2,7 @@
 
 Generate comprehensive project reports from Notion with tasks, notes, and properties. Perfect for AI consumption and project overviews.
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 
 ## Features
 
