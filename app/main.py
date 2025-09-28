@@ -164,13 +164,10 @@ async def generate_report(page_id: str) -> dict:
     """Generate a plain text report for a Notion project."""
     try:
         # 1. Fetch Project page
-        print(f"DEBUG: MD Core - Fetching project page: {page_id}")
         project_page = await notion_api.get_page(page_id)
         project_title = get_page_title(project_page)
-        print(f"DEBUG: MD Core - Project title: {project_title}")
         
         # 2. Extract relation IDs
-        print(f"DEBUG: MD Core - Extracting relation IDs...")
         notes_ids = notion_api.extract_relation_ids(
             project_page, 
             settings.notion_rel_project_to_notes
@@ -179,37 +176,27 @@ async def generate_report(page_id: str) -> dict:
             project_page, 
             settings.notion_rel_project_to_tasks
         )
-        print(f"DEBUG: MD Core - Found {len(notes_ids)} notes, {len(tasks_ids)} tasks")
         
         # 3. Fetch all pages and their blocks
-        print(f"DEBUG: MD Core - Fetching project blocks...")
         project_blocks = await notion_api.get_block_children(page_id)
         project_content = await blocks_to_text_with_children(project_blocks, notion_api)
-        print(f"DEBUG: MD Core - Project content length: {len(project_content)}")
         
         # Fetch notes
-        print(f"DEBUG: MD Core - Processing {len(notes_ids)} notes...")
         notes_content = []
         for i, note_id in enumerate(notes_ids):
             try:
-                print(f"DEBUG: MD Core - Processing note {i+1}/{len(notes_ids)}: {note_id}")
                 note_page = await notion_api.get_page(note_id)
                 note_title = get_page_title(note_page)
                 note_blocks = await notion_api.get_block_children(note_id)
                 note_content = await blocks_to_text_with_children(note_blocks, notion_api, flatten_headings=True)
                 notes_content.append(f"### {note_title}\n\n{note_content}\n")
-                print(f"DEBUG: MD Core - Note {i+1} processed successfully")
             except Exception as e:
-                print(f"Warning: Could not process note {note_id}: {e}")
                 notes_content.append(f"### [Error loading note: {str(e)}]\n\n")
-        print(f"DEBUG: MD Core - Processed {len(notes_content)} notes successfully")
         
         # Fetch tasks
-        print(f"DEBUG: MD Core - Processing {len(tasks_ids)} tasks...")
         tasks_content = []
         for i, task_id in enumerate(tasks_ids):
             try:
-                print(f"DEBUG: MD Core - Processing task {i+1}/{len(tasks_ids)}: {task_id}")
                 task_page = await notion_api.get_page(task_id)
                 task_title = get_page_title(task_page)
                 
@@ -240,14 +227,10 @@ async def generate_report(page_id: str) -> dict:
                 task_content = await blocks_to_text_with_children(task_blocks, notion_api, flatten_headings=True)
                 
                 tasks_content.append(f"### {task_title}{properties_str}\n\n{task_content}\n")
-                print(f"DEBUG: MD Core - Task {i+1} processed successfully")
             except Exception as e:
-                print(f"Warning: Could not process task {task_id}: {e}")
                 tasks_content.append(f"### [Error loading task: {str(e)}]\n\n")
-        print(f"DEBUG: MD Core - Processed {len(tasks_content)} tasks successfully")
         
         # 4. Build final report
-        print(f"DEBUG: MD Core - Building final report...")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
         
         # Build the main content first
@@ -297,14 +280,12 @@ async def generate_report(page_id: str) -> dict:
         )
         
         # 6. Update Project URL property
-        print(f"DEBUG: MD Core - Updating project page with PDF URL...")
         await notion_api.update_page_url_property(
             page_id,
             settings.notion_project_pdf_url_prop,
             public_url
         )
         
-        print(f"DEBUG: MD Core - Report generation completed successfully")
         return {
             "status": "ok",
             "url": public_url,
@@ -559,7 +540,6 @@ async def web_interface():
                     
                     select.disabled = false;
                 } catch (error) {
-                    console.error('Error loading projects:', error);
                     select.innerHTML = '<option value="">❌ Error loading projects</option>';
                     select.disabled = false;
                 }
@@ -663,7 +643,6 @@ async def web_interface():
                 
                 // Set a timeout to reset button if request takes too long
                 const timeoutId = setTimeout(() => {
-                    console.warn('PDF generation timeout - resetting button');
                     downloadPdfBtn.innerHTML = '📋 Download PDF';
                     downloadPdfBtn.style.pointerEvents = 'auto';
                     downloadPdfBtn.classList.remove('loading');
@@ -679,17 +658,13 @@ async def web_interface():
                         body: JSON.stringify({ page_id: pageId })
                     });
                     
-                    console.log('PDF Response status:', response.status);
-                    console.log('PDF Response ok:', response.ok);
                     
                     if (!response.ok) {
                         const errorText = await response.text();
-                        console.error('PDF Error response:', errorText);
                         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                     }
                     
                     const result = await response.json();
-                    console.log('PDF Response data:', result);
                     
                     // Clear timeout since we got a response
                     clearTimeout(timeoutId);
@@ -709,7 +684,6 @@ async def web_interface():
                             downloadUrl = `/download/${filePath}`;
                         }
                         
-                        console.log('Final download URL:', downloadUrl);
                         
                         // Update PDF button with download link
                         downloadPdfBtn.href = downloadUrl;
@@ -740,7 +714,6 @@ async def web_interface():
                     }
                 } catch (error) {
                     clearTimeout(timeoutId);
-                    console.error('PDF Generation Error:', error);
                     showStatus(`Error: ${error.message}`, 'error');
                     downloadPdfBtn.innerHTML = '📋 Download PDF';
                     downloadPdfBtn.style.pointerEvents = 'auto';
@@ -837,10 +810,7 @@ async def get_projects():
     try:
         # Use the database ID from your URL
         database_id = "a39c93bf51c64b2cb57ace514ff96817"
-        print(f"DEBUG: Fetching projects from database {database_id}")
-        
         pages = await notion_api.get_database_pages(database_id)
-        print(f"DEBUG: Retrieved {len(pages)} pages from database")
         
         projects = []
         for page in pages:
@@ -873,16 +843,9 @@ async def get_projects():
                     status=status
                 ))
             except Exception as page_error:
-                print(f"WARNING: Error processing page {page.get('id', 'unknown')}: {page_error}")
                 continue
-        
-        print(f"DEBUG: Returning {len(projects)} projects")
         return projects
     except Exception as e:
-        print(f"ERROR: Failed to fetch projects: {str(e)}")
-        print(f"ERROR: Exception type: {type(e).__name__}")
-        import traceback
-        print(f"ERROR: Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch projects: {str(e)}")
 
 
@@ -890,21 +853,12 @@ async def get_projects():
 async def generate_report_api(request: GenerateRequest):
     """Generate report via API with URL parsing."""
     try:
-        print(f"DEBUG: MD API - Parsing page ID: {request.page_id}")
         page_id = parse_notion_url(request.page_id)
-        print(f"DEBUG: MD API - Parsed page ID: {page_id}")
-        print(f"DEBUG: MD API - Starting report generation...")
         result = await generate_report(page_id)
-        print(f"DEBUG: MD API - Report generation completed successfully")
         return result
     except ValueError as e:
-        print(f"ERROR: MD API - ValueError: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"ERROR: MD API - Exception: {e}")
-        print(f"ERROR: MD API - Exception type: {type(e).__name__}")
-        import traceback
-        print(f"ERROR: MD API - Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
 
 
@@ -930,18 +884,13 @@ async def download_file(file_path: str):
 async def generate_pdf_api(request: GenerateRequest):
     """Generate PDF report via API with URL parsing."""
     try:
-        print(f"DEBUG: PDF API - Parsing page ID: {request.page_id}")
         page_id = parse_notion_url(request.page_id)
-        print(f"DEBUG: PDF API - Parsed page ID: {page_id}")
         
         # Get project details directly
-        print(f"DEBUG: PDF API - Fetching project page...")
         project_page = await notion_api.get_page(page_id)
         project_title = get_page_title(project_page)
-        print(f"DEBUG: PDF API - Project title: {project_title}")
         
         # Extract relation IDs
-        print(f"DEBUG: PDF API - Extracting relation IDs...")
         notes_ids = notion_api.extract_relation_ids(
             project_page, 
             settings.notion_rel_project_to_notes
@@ -950,37 +899,27 @@ async def generate_pdf_api(request: GenerateRequest):
             project_page, 
             settings.notion_rel_project_to_tasks
         )
-        print(f"DEBUG: PDF API - Found {len(notes_ids)} notes, {len(tasks_ids)} tasks")
         
         # Fetch all pages and their blocks
-        print(f"DEBUG: PDF API - Fetching project blocks...")
         project_blocks = await notion_api.get_block_children(page_id)
         project_content = await blocks_to_text_with_children(project_blocks, notion_api)
-        print(f"DEBUG: PDF API - Project content length: {len(project_content)}")
         
         # Fetch notes
-        print(f"DEBUG: PDF API - Processing {len(notes_ids)} notes...")
         notes_content = []
         for i, note_id in enumerate(notes_ids):
             try:
-                print(f"DEBUG: PDF API - Processing note {i+1}/{len(notes_ids)}: {note_id}")
                 note_page = await notion_api.get_page(note_id)
                 note_title = get_page_title(note_page)
                 note_blocks = await notion_api.get_block_children(note_id)
                 note_content = await blocks_to_text_with_children(note_blocks, notion_api, flatten_headings=True)
                 notes_content.append(f"### {note_title}\n\n{note_content}\n")
-                print(f"DEBUG: PDF API - Note {i+1} processed successfully")
             except Exception as e:
-                print(f"Warning: Could not process note {note_id}: {e}")
                 notes_content.append(f"### [Error loading note: {str(e)}]\n\n")
-        print(f"DEBUG: PDF API - Processed {len(notes_content)} notes successfully")
         
         # Fetch tasks
-        print(f"DEBUG: PDF API - Processing {len(tasks_ids)} tasks...")
         tasks_content = []
         for i, task_id in enumerate(tasks_ids):
             try:
-                print(f"DEBUG: PDF API - Processing task {i+1}/{len(tasks_ids)}: {task_id}")
                 task_page = await notion_api.get_page(task_id)
                 task_title = get_page_title(task_page)
                 
@@ -1011,11 +950,8 @@ async def generate_pdf_api(request: GenerateRequest):
                 task_content = await blocks_to_text_with_children(task_blocks, notion_api, flatten_headings=True)
                 
                 tasks_content.append(f"### {task_title}{properties_str}\n\n{task_content}\n")
-                print(f"DEBUG: PDF API - Task {i+1} processed successfully")
             except Exception as e:
-                print(f"Warning: Could not process task {task_id}: {e}")
                 tasks_content.append(f"### [Error loading task: {str(e)}]\n\n")
-        print(f"DEBUG: PDF API - Processed {len(tasks_content)} tasks successfully")
         
         # Build the main content
         main_content = f"""# {project_title}
@@ -1070,9 +1006,6 @@ async def generate_pdf_api(request: GenerateRequest):
         
         # Generate PDF
         try:
-            print(f"DEBUG: Starting PDF generation for {title}")
-            print(f"DEBUG: Content length: {len(md_content)} characters")
-            print(f"DEBUG: PDF path: {pdf_path}")
             
             # Ensure directory exists
             os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
@@ -1099,7 +1032,6 @@ async def generate_pdf_api(request: GenerateRequest):
             if file_size == 0:
                 raise ValueError("Generated PDF file is empty")
             
-            print(f"DEBUG: PDF generated successfully at: {generated_pdf_path} (size: {file_size} bytes)")
             
             # Return file URL for download
             file_url = f"file://{generated_pdf_path}"
@@ -1123,13 +1055,11 @@ async def generate_pdf_api(request: GenerateRequest):
             
             # Try fallback with simplified content
             try:
-                print("DEBUG: Attempting fallback PDF generation with simplified content...")
                 simplified_content = f"# {title}\n\n*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n{md_content[:5000]}..." if len(md_content) > 5000 else f"# {title}\n\n*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n\n{md_content}"
                 fallback_pdf_path = os.path.join(pdf_dir, f"project-{title.lower().replace(' ', '-')}-{datetime.now().strftime('%Y%m%d_%H%M%S')}-fallback.pdf")
                 fallback_pdf_path = generate_pdf_from_markdown(simplified_content, fallback_pdf_path, f"{title} (Simplified)")
                 file_url = f"file://{fallback_pdf_path}"
                 pdf_filename = os.path.basename(fallback_pdf_path)
-                print(f"DEBUG: Fallback PDF generated successfully at: {fallback_pdf_path}")
                 return {
                     "success": True,
                     "title": f"{title} (Simplified)",
