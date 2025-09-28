@@ -51,8 +51,10 @@ Thumbs.db
 
 # Local reports (generated files)
 local_reports/
-*.md
 *.txt
+
+# Generated markdown reports (but keep README.md)
+local_reports/**/*.md
 
 # Logs
 *.log
