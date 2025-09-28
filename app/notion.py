@@ -72,6 +72,33 @@ class NotionAPI:
                 }
             )
             response.raise_for_status()
+    
+    async def get_database_pages(self, database_id: str) -> List[Dict[str, Any]]:
+        """Fetch all pages from a Notion database."""
+        all_pages = []
+        start_cursor = None
+        
+        async with httpx.AsyncClient() as client:
+            while True:
+                params = {"page_size": 100}
+                if start_cursor:
+                    params["start_cursor"] = start_cursor
+                
+                response = await client.post(
+                    f"{self.base_url}/databases/{database_id}/query",
+                    headers=self.headers,
+                    json=params
+                )
+                response.raise_for_status()
+                data = response.json()
+                
+                all_pages.extend(data["results"])
+                
+                if not data.get("has_more"):
+                    break
+                start_cursor = data.get("next_cursor")
+        
+        return all_pages
 
 
 # Global instance

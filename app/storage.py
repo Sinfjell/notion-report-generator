@@ -28,7 +28,8 @@ def upload_text_local(file_path: str, text: str) -> str:
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(text)
     
-    return f"file://{os.path.abspath(file_path)}"
+    # Return relative path for download endpoint
+    return f"file://{file_path}"
 
 
 def upload_text_public(bucket_name: str, blob_path: str, text: str) -> str:

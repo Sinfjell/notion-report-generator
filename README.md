@@ -2,17 +2,43 @@
 
 Generate comprehensive project reports from Notion with tasks, notes, and properties. Perfect for AI consumption and project overviews.
 
+**Version:** 1.1.0
+
 ## Features
 
 - 📊 **Comprehensive Reports**: Extract project content, related tasks, and notes
 - 🎯 **Rich Task Properties**: Status, priority, due dates, completion info, and custom formulas
 - 📝 **Markdown Output**: Clean, structured reports with table of contents
 - 🤖 **AI-Optimized**: Perfect structure for AI consumption and analysis
+- 🌐 **Web Interface**: Simple HTML interface with project dropdown and download functionality
 - 🔄 **Flexible Storage**: Support for both local file storage and Google Cloud Storage
 - ⚡ **FastAPI Backend**: RESTful API with automatic documentation
-- 🐳 **Docker Ready**: Easy deployment to Google Cloud Run
+- 🐳 **Docker Ready**: Easy deployment with single container setup
 
 ## Quick Start
+
+### Docker (Recommended)
+
+1. **Clone and setup**:
+   ```bash
+   git clone https://github.com/Sinfjell/notion-report-generator.git
+   cd notion-report-generator
+   ```
+
+2. **Set your Notion API token**:
+   ```bash
+   export NOTION_API_TOKEN='your_notion_api_token_here'
+   ```
+
+3. **Run with Docker**:
+   ```bash
+   ./docker-run.sh
+   ```
+
+4. **Access the web interface**:
+   - Open http://localhost:8080 in your browser
+   - Select a project from the dropdown or paste a Notion URL
+   - Click "Generate Report" and download the result
 
 ### Local Development
 
@@ -60,9 +86,13 @@ Generate comprehensive project reports from Notion with tasks, notes, and proper
 
 ## API Endpoints
 
+- `GET /` - Web interface with project dropdown
+- `GET /api/projects` - Get list of projects from Notion database
+- `POST /api/generate` - Generate report via API with URL parsing
+- `GET /download/{file_path}` - Download generated report file
 - `GET /healthz` - Health check
-- `GET /generate?page_id=...` - Generate report via GET
-- `POST /generate` - Generate report via POST with JSON body
+- `GET /generate?page_id=...` - Generate report via GET (legacy)
+- `POST /generate` - Generate report via POST with JSON body (legacy)
 - `GET /docs` - Interactive API documentation
 
 ## Report Structure
