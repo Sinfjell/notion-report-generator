@@ -1009,6 +1009,9 @@ async def generate_pdf_api(request: GenerateRequest):
             print(f"ERROR: Exception type: {type(e).__name__}")
             import traceback
             print(f"ERROR: Traceback: {traceback.format_exc()}")
+            # Log additional context
+            print(f"ERROR: Content length: {len(md_content) if 'md_content' in locals() else 'N/A'}")
+            print(f"ERROR: PDF path: {pdf_path if 'pdf_path' in locals() else 'N/A'}")
             raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}")
             
     except ValueError as e:

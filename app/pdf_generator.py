@@ -33,10 +33,49 @@ def generate_pdf_from_markdown(md_content: str, output_path: str, title: str = "
     pdf_path.parent.mkdir(parents=True, exist_ok=True)
     
     # Convert HTML to PDF with WeasyPrint
-    html_doc = weasyprint.HTML(string=styled_html)
-    html_doc.write_pdf(str(pdf_path))
+    try:
+        html_doc = weasyprint.HTML(string=styled_html)
+        html_doc.write_pdf(str(pdf_path))
+    except Exception as e:
+        print(f"Warning: PDF generation failed, retrying with simplified content: {e}")
+        # Try with simplified HTML if complex styling fails
+        simplified_html = create_simplified_html(html_content, title)
+        html_doc = weasyprint.HTML(string=simplified_html)
+        html_doc.write_pdf(str(pdf_path))
     
     return str(pdf_path)
+
+
+def create_simplified_html(html_content: str, title: str) -> str:
+    """
+    Create a simplified HTML document for PDF generation when complex styling fails.
+    """
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>{title}</title>
+        <style>
+            @page {{ size: A4; margin: 1in; }}
+            body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+            h1, h2, h3 {{ color: #333; margin-top: 1em; }}
+            h1 {{ font-size: 2em; }}
+            h2 {{ font-size: 1.5em; }}
+            h3 {{ font-size: 1.2em; }}
+            pre {{ background: #f4f4f4; padding: 10px; overflow-x: auto; }}
+            code {{ background: #f0f0f0; padding: 2px 4px; }}
+            p {{ margin-bottom: 1em; }}
+            ul, ol {{ margin-bottom: 1em; }}
+        </style>
+    </head>
+    <body>
+        <h1>{title}</h1>
+        <p>Generated on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+        {html_content}
+    </body>
+    </html>
+    """
 
 
 def create_styled_html(html_content: str, title: str) -> str:
