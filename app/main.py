@@ -773,40 +773,52 @@ async def get_projects():
     try:
         # Use the database ID from your URL
         database_id = "a39c93bf51c64b2cb57ace514ff96817"
+        print(f"DEBUG: Fetching projects from database {database_id}")
+        
         pages = await notion_api.get_database_pages(database_id)
+        print(f"DEBUG: Retrieved {len(pages)} pages from database")
         
         projects = []
         for page in pages:
-            title = get_page_title(page)
-            page_id = page.get("id", "")
-            
-            # Extract status from page properties
-            status = "No Status"
-            properties = page.get("properties", {})
-            
-            # Check for status in various property names
-            for status_prop_name in ["Status", "Kanban", "State", "Phase"]:
-                status_prop = properties.get(status_prop_name, {})
-                if status_prop.get("type") == "status":
-                    status_value = status_prop.get("status", {})
-                    if status_value and status_value.get("name"):
-                        status = status_value.get("name")
-                        break
-                elif status_prop.get("type") == "select":
-                    select_value = status_prop.get("select", {})
-                    if select_value and select_value.get("name"):
-                        status = select_value.get("name")
-                        break
-            
-            projects.append(ProjectOption(
-                id=page_id,
-                title=title,
-                url=f"https://notion.so/{page_id.replace('-', '')}",
-                status=status
-            ))
+            try:
+                title = get_page_title(page)
+                page_id = page.get("id", "")
+                
+                # Extract status from page properties
+                status = "No Status"
+                properties = page.get("properties", {})
+                
+                # Check for status in various property names
+                for status_prop_name in ["Status", "Kanban", "State", "Phase"]:
+                    status_prop = properties.get(status_prop_name, {})
+                    if status_prop.get("type") == "status":
+                        status_value = status_prop.get("status", {})
+                        if status_value and status_value.get("name"):
+                            status = status_value.get("name")
+                            break
+                    elif status_prop.get("type") == "select":
+                        select_value = status_prop.get("select", {})
+                        if select_value and select_value.get("name"):
+                            status = select_value.get("name")
+                            break
+                
+                projects.append(ProjectOption(
+                    id=page_id,
+                    title=title,
+                    url=f"https://notion.so/{page_id.replace('-', '')}",
+                    status=status
+                ))
+            except Exception as page_error:
+                print(f"WARNING: Error processing page {page.get('id', 'unknown')}: {page_error}")
+                continue
         
+        print(f"DEBUG: Returning {len(projects)} projects")
         return projects
     except Exception as e:
+        print(f"ERROR: Failed to fetch projects: {str(e)}")
+        print(f"ERROR: Exception type: {type(e).__name__}")
+        import traceback
+        print(f"ERROR: Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch projects: {str(e)}")
 
 
