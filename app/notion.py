@@ -11,10 +11,12 @@ class NotionAPI:
             "Notion-Version": "2022-06-28",
             "Content-Type": "application/json"
         }
+        # Increase timeout for large databases
+        self.timeout = httpx.Timeout(30.0, connect=10.0)
     
     async def get_page(self, page_id: str) -> Dict[str, Any]:
         """Fetch a Notion page by ID."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.get(
                 f"{self.base_url}/pages/{page_id}",
                 headers=self.headers
@@ -27,7 +29,7 @@ class NotionAPI:
         all_blocks = []
         start_cursor = None
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             while True:
                 params = {"page_size": page_size}
                 if start_cursor:
@@ -59,7 +61,7 @@ class NotionAPI:
     
     async def update_page_url_property(self, page_id: str, prop_name: str, url: str) -> None:
         """Update a URL property on a Notion page."""
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.patch(
                 f"{self.base_url}/pages/{page_id}",
                 headers=self.headers,
@@ -78,7 +80,7 @@ class NotionAPI:
         all_pages = []
         start_cursor = None
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
             while True:
                 params = {"page_size": 100}
                 if start_cursor:

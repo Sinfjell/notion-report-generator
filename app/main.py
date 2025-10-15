@@ -143,6 +143,25 @@ def parse_notion_url(url_or_id: str) -> str:
 app = FastAPI(title="Notion Report Generator", version="1.2.0")
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Run startup checks."""
+    print("=" * 60)
+    print("🚀 Starting Notion Report Generator")
+    print("=" * 60)
+    print(f"Notion API Token configured: {'✅ Yes' if settings.notion_api_token else '❌ No'}")
+    print(f"Using local storage: {'✅ Yes' if settings.use_local_storage else '❌ No'}")
+    print(f"Local storage path: {settings.local_storage_path}")
+    if not settings.use_local_storage:
+        print(f"GCS Bucket: {settings.gcs_bucket if settings.gcs_bucket else '❌ Not set'}")
+    print("=" * 60)
+    
+    if not settings.notion_api_token:
+        print("⚠️  WARNING: NOTION_API_TOKEN not configured!")
+        print("   Set it with environment variable: NOTION_API_TOKEN")
+        print("=" * 60)
+
+
 class GenerateRequest(BaseModel):
     page_id: str
 
@@ -468,6 +487,11 @@ async def web_interface():
             
             <form id="reportForm">
                 <div class="form-group">
+                    <label for="searchInput">Search Projects:</label>
+                    <input type="text" id="searchInput" placeholder="Type to search projects...">
+                </div>
+                
+                <div class="form-group">
                     <label for="projectSelect">Select Project:</label>
                     <select id="projectSelect" required>
                         <option value="">Loading projects...</option>
@@ -500,6 +524,58 @@ async def web_interface():
         <script>
             let projects = [];
             
+            // Render projects in the dropdown
+            function renderProjects(projectsToRender) {
+                const select = document.getElementById('projectSelect');
+                select.innerHTML = '<option value="">Select a project...</option>';
+                
+                if (projectsToRender.length === 0) {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'No projects found';
+                    select.appendChild(option);
+                    return;
+                }
+                
+                // Group projects by status
+                const groupedProjects = groupProjectsByStatus(projectsToRender);
+                
+                // Add grouped options
+                Object.keys(groupedProjects).forEach(status => {
+                    const group = groupedProjects[status];
+                    if (group.length > 0) {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = `${getStatusIcon(status)} ${status} (${group.length})`;
+                        select.appendChild(optgroup);
+                        
+                        group.forEach(project => {
+                            const option = document.createElement('option');
+                            option.value = project.id;
+                            option.textContent = project.title;
+                            optgroup.appendChild(option);
+                        });
+                    }
+                });
+                
+                // Auto-select first project
+                if (projectsToRender.length > 0) {
+                    select.value = projectsToRender[0].id;
+                    select.classList.add('loaded');
+                }
+            }
+            
+            // Filter projects based on search input
+            function filterProjects(searchTerm) {
+                if (!searchTerm || searchTerm.trim() === '') {
+                    return projects;
+                }
+                
+                const searchLower = searchTerm.toLowerCase();
+                return projects.filter(project => 
+                    project.title.toLowerCase().includes(searchLower)
+                );
+            }
+            
             // Load projects on page load
             async function loadProjects() {
                 const select = document.getElementById('projectSelect');
@@ -510,34 +586,7 @@ async def web_interface():
                     const response = await fetch('/api/projects');
                     projects = await response.json();
                     
-                    select.innerHTML = '<option value="">Select a project...</option>';
-                    
-                    // Group projects by status
-                    const groupedProjects = groupProjectsByStatus(projects);
-                    
-                    // Add grouped options
-                    Object.keys(groupedProjects).forEach(status => {
-                        const group = groupedProjects[status];
-                        if (group.length > 0) {
-                            const optgroup = document.createElement('optgroup');
-                            optgroup.label = `${getStatusIcon(status)} ${status} (${group.length})`;
-                            select.appendChild(optgroup);
-                            
-                            group.forEach(project => {
-                                const option = document.createElement('option');
-                                option.value = project.id;
-                                option.textContent = project.title;
-                                optgroup.appendChild(option);
-                            });
-                        }
-                    });
-                    
-                    // Auto-select first project
-                    if (projects.length > 0) {
-                        select.value = projects[0].id;
-                        select.classList.add('loaded');
-                    }
-                    
+                    renderProjects(projects);
                     select.disabled = false;
                 } catch (error) {
                     select.innerHTML = '<option value="">❌ Error loading projects</option>';
@@ -796,6 +845,13 @@ async def web_interface():
                 }
             });
             
+            // Add event listener for search input
+            document.getElementById('searchInput').addEventListener('input', function(e) {
+                const searchTerm = e.target.value;
+                const filteredProjects = filterProjects(searchTerm);
+                renderProjects(filteredProjects);
+            });
+            
             // Load projects when page loads
             loadProjects();
         </script>
@@ -808,9 +864,26 @@ async def web_interface():
 async def get_projects():
     """Get list of projects from Notion database."""
     try:
+        # Check if API token is configured
+        if not settings.notion_api_token:
+            print("ERROR: NOTION_API_TOKEN not configured!")
+            raise HTTPException(
+                status_code=500, 
+                detail="Notion API token not configured. Please set NOTION_API_TOKEN environment variable."
+            )
+        
         # Use the database ID from your URL
         database_id = "a39c93bf51c64b2cb57ace514ff96817"
-        pages = await notion_api.get_database_pages(database_id)
+        print(f"Fetching projects from database: {database_id}")
+        
+        try:
+            pages = await notion_api.get_database_pages(database_id)
+            print(f"Successfully fetched {len(pages)} pages from Notion")
+        except Exception as api_error:
+            print(f"ERROR: Failed to fetch from Notion API: {str(api_error)}")
+            import traceback
+            print(f"ERROR: Traceback: {traceback.format_exc()}")
+            raise
         
         projects = []
         for page in pages:
@@ -836,6 +909,10 @@ async def get_projects():
                             status = select_value.get("name")
                             break
                 
+                # Filter for "Live project" status only
+                if status != "Live project":
+                    continue
+                
                 projects.append(ProjectOption(
                     id=page_id,
                     title=title,
@@ -843,9 +920,17 @@ async def get_projects():
                     status=status
                 ))
             except Exception as page_error:
+                print(f"WARNING: Error processing page: {str(page_error)}")
                 continue
+        
+        print(f"Successfully processed {len(projects)} projects")
         return projects
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"ERROR: Unexpected error in get_projects: {str(e)}")
+        import traceback
+        print(f"ERROR: Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch projects: {str(e)}")
 
 
