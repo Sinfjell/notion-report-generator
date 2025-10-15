@@ -493,7 +493,7 @@ async def web_interface():
                 
                 <div class="form-group">
                     <label for="projectSelect">Select Project:</label>
-                    <select id="projectSelect" required>
+                    <select id="projectSelect">
                         <option value="">Loading projects...</option>
                     </select>
                 </div>
@@ -675,10 +675,8 @@ async def web_interface():
                 const projectSelect = document.getElementById('projectSelect');
                 const customInput = document.getElementById('customInput');
                 
-                let pageId = projectSelect.value;
-                if (customInput.value.trim()) {
-                    pageId = customInput.value.trim();
-                }
+                // Prioritize custom input over dropdown selection
+                let pageId = customInput.value.trim() || projectSelect.value;
                 
                 if (!pageId) {
                     showStatus('Please select a project or enter a URL/Page ID', 'error');
@@ -783,20 +781,16 @@ async def web_interface():
                 const customInput = document.getElementById('customInput');
                 const generateBtn = document.getElementById('generateBtn');
                 
-                let pageId = projectSelect.value || customInput.value.trim();
+                // Prioritize custom input over dropdown selection
+                let pageId = customInput.value.trim() || projectSelect.value;
                 
                 if (!pageId) {
                     showStatus('Please select a project or enter a URL/Page ID', 'error');
                     return;
                 }
                 
-                // Clear dropdown validation if custom input is used
-                if (customInput.value.trim()) {
-                    projectSelect.setCustomValidity('');
-                    projectSelect.required = false;
-                } else {
-                    projectSelect.required = true;
-                }
+                // Clear any validation messages
+                projectSelect.setCustomValidity('');
                 
                 // Disable button and show loading
                 generateBtn.disabled = true;
